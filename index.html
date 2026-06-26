@@ -4,25 +4,54 @@
     <meta charset="UTF-8">
     <title>IDE Collaboratif Synchrone Pro</title>
     <style>
-        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #1e1e1e; color: #fff; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-        #top-bar { height: 45px; background: #2d2d2d; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #3c3c3c; z-index: 100; }
+        /* Variables globales pour Thème Sombre / Clair */
+        :root {
+            --bg-main: #1e1e1e;
+            --bg-topbar: #2d2d2d;
+            --bg-sidebar: #252526;
+            --border-color: #3c3c3c;
+            --text-main: #fff;
+            --text-muted: #858585;
+            --bg-hover: #2a2d2e;
+            --bg-terminal: #181818;
+            --bg-input: #3c3c3c;
+            --bg-tab-active: #1e1e1e;
+            --bg-tab-inactive: #2d2d2d;
+        }
+
+        [data-theme="light"] {
+            --bg-main: #ffffff;
+            --bg-topbar: #f3f3f3;
+            --bg-sidebar: #f3f3f3;
+            --border-color: #cccccc;
+            --text-main: #333333;
+            --text-muted: #666666;
+            --bg-hover: #e5e5e5;
+            --bg-terminal: #f9f9f9;
+            --bg-input: #ffffff;
+            --bg-tab-active: #ffffff;
+            --bg-tab-inactive: #e0e0e0;
+        }
+
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-main); color: var(--text-main); display: flex; flex-direction: column; height: 100vh; overflow: hidden; transition: background 0.2s, color 0.2s; }
+        #top-bar { height: 45px; background: var(--bg-topbar); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid var(--border-color); z-index: 100; transition: background 0.2s; }
         #main-container { display: flex; flex: 1; height: calc(100vh - 45px); position: relative; }
         
         /* Explorateur & Recherche */
-        #sidebar { width: 280px; background: #252526; border-right: 1px solid #3c3c3c; display: flex; flex-direction: column; overflow: hidden; z-index: 50; }
-        .sidebar-header { padding: 10px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #858585; display: flex; justify-content: space-between; align-items: center; }
-        .search-box-container { padding: 0 10px 10px 10px; border-bottom: 1px solid #3c3c3c; }
-        .search-input { width: 100%; background: #3c3c3c; border: 1px solid #6b6b6b; color: white; padding: 6px; border-radius: 4px; box-sizing: border-box; font-size: 12px; }
+        #sidebar { width: 280px; background: var(--bg-sidebar); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; overflow: hidden; z-index: 50; transition: background 0.2s; }
+        .sidebar-header { padding: 10px; font-weight: bold; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center; }
+        .search-box-container { padding: 0 10px 10px 10px; border-bottom: 1px solid var(--border-color); }
+        .search-input { width: 100%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-main); padding: 6px; border-radius: 4px; box-sizing: border-box; font-size: 12px; }
         .search-input:focus { border-color: #007acc; outline: none; }
 
         /* Arborescence Graphique */
         .tree-root { list-style: none; padding-left: 10px; margin: 0; overflow-y: auto; flex: 1; padding-top: 10px; }
         .tree-folder { cursor: pointer; padding: 4px 5px; display: flex; align-items: center; font-size: 13px; font-weight: bold; color: #e8a838; user-select: none; justify-content: space-between; }
-        .tree-folder:hover { background: #2a2d2e; }
-        .tree-file { cursor: pointer; padding: 4px 20px; font-size: 13px; color: #ccc; display: flex; justify-content: space-between; align-items: center; }
-        .tree-file:hover { background: #2a2d2e; color: #fff; }
-        .tree-file.active { background: #37373d; color: #007acc; font-weight: bold; border-left: 2px solid #007acc; }
-        .tree-file.search-match { background: #433519; border-left: 2px solid #e8a838; }
+        .tree-folder:hover { background: var(--bg-hover); }
+        .tree-file { cursor: pointer; padding: 4px 20px; font-size: 13px; color: var(--text-main); opacity: 0.8; display: flex; justify-content: space-between; align-items: center; }
+        .tree-file:hover { background: var(--bg-hover); opacity: 1; }
+        .tree-file.active { background: rgba(0, 122, 204, 0.15); color: #007acc; font-weight: bold; border-left: 2px solid #007acc; opacity: 1; }
+        .tree-file.search-match { background: rgba(232, 168, 56, 0.2); border-left: 2px solid #e8a838; }
         .folder-children { list-style: none; padding-left: 15px; margin: 0; }
         .folder-children.collapsed { display: none; }
         
@@ -30,65 +59,58 @@
         #editor-container { flex: 1; position: relative; height: 100%; width: 100%; }
         .btn-menu { background: #0e639c; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-size: 13px; font-weight: bold; }
         .btn-menu:hover { background: #1177bb; }
-        .btn-action { background: #333; border: 1px solid #555; color: #fff; cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
-        .btn-action:hover { background: #444; }
-        #status { font-size: 12px; color: #fff; background: #2d2d2d; padding: 4px 10px; border-radius: 4px; border: 1px solid #555; }
+        .btn-action { background: rgba(128,128,128,0.2); border: 1px solid var(--border-color); color: var(--text-main); cursor: pointer; font-size: 11px; padding: 2px 6px; border-radius: 3px; }
+        .btn-action:hover { background: rgba(128,128,128,0.4); }
+        #status { font-size: 12px; color: var(--text-main); background: var(--bg-tab-inactive); padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border-color); }
         #session-badge { background: #cf6a15; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; display: none; font-weight: bold; }
 
-        /* Curseurs Texte Distants */
-        .remote-cursor { width: 2px !important; background: currentColor; }
+        /* Utilisateurs Connectés */
+        #users-list { display: flex; gap: 5px; align-items: center; font-size: 11px; margin-right: 10px; }
+        .user-tag { padding: 2px 6px; border-radius: 3px; color: #fff; font-weight: bold; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+        /* Curseurs Texte Distants Plus Visibles */
+        .remote-cursor { width: 3px !important; background: currentColor; box-shadow: 0 0 6px currentColor; }
         .remote-cursor-tooltip {
-            position: absolute; color: white; font-size: 10px; font-weight: bold; padding: 1px 5px;
-            border-radius: 3px 3px 3px 0px; background: currentColor; white-space: nowrap; top: -17px; left: 2px;
-            pointer-events: none; z-index: 10;
+            position: absolute; color: white !important; font-size: 11px; font-weight: bold; padding: 2px 6px;
+            border-radius: 4px 4px 4px 0px; background: currentColor; white-space: nowrap; top: -20px; left: 3px;
+            pointer-events: none; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
 
-        /* Souris volantes */
+        /* Souris Volantes Plus Visibles (Forme Curseur) */
         .fake-mouse-pointer {
-            position: absolute; width: 12px; height: 12px;
-            border-left: 3px solid currentColor; border-top: 3px solid currentColor;
-            transform: rotate(-25deg); pointer-events: none; z-index: 9999; transition: top 0.05s, left 0.05s;
+            position: absolute; width: 0; height: 0;
+            border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 16px solid currentColor;
+            transform: rotate(-25deg); pointer-events: none; z-index: 9999; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));
         }
         .fake-mouse-label {
-            position: absolute; top: 15px; left: 5px; color: white; font-size: 10px;
-            font-weight: bold; padding: 1px 4px; border-radius: 3px; background: currentColor; white-space: nowrap;
+            position: absolute; top: 18px; left: 6px; color: white !important; font-size: 11px;
+            font-weight: bold; padding: 2px 6px; border-radius: 4px; background: currentColor; white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
         }
 
-        /* STYLES DES NOUVELLES FONCTIONNALITÉS (ONGLETS ET PASTILLES) */
+        /* Onglets et Pastilles géolocalisées */
         #tabs-container { 
-            display: flex; 
-            background: #252526; 
-            border-bottom: 1px solid #3c3c3c; 
-            height: 35px; 
-            overflow-x: auto; 
-            align-items: center; 
-            padding-left: 5px;
-            gap: 2px;
+            display: flex; background: var(--bg-sidebar); border-bottom: 1px solid var(--border-color); 
+            height: 35px; overflow-x: auto; align-items: center; padding-left: 5px; gap: 2px;
         }
         .tab {
-            display: flex;
-            align-items: center;
-            background: #2d2d2d;
-            color: #969696;
-            padding: 0 12px;
-            height: 100%;
-            border-right: 1px solid #252526;
-            cursor: pointer;
-            user-select: none;
-            font-size: 13px;
+            display: flex; align-items: center; background: var(--bg-tab-inactive); color: var(--text-muted);
+            padding: 0 12px; height: 100%; border-right: 1px solid var(--border-color); cursor: pointer; user-select: none; font-size: 13px;
         }
-        .tab.active { background: #1e1e1e; color: #fff; border-top: 2px solid #007acc; }
-        .tab .close-tab { margin-left: 8px; color: #888; cursor: pointer; font-size: 11px; }
+        .tab.active { background: var(--bg-tab-active); color: var(--text-main); border-top: 2px solid #007acc; }
+        .tab .close-tab { margin-left: 8px; color: var(--text-muted); cursor: pointer; font-size: 11px; }
         .tab .close-tab:hover { color: #ff4545; }
 
-        .user-badge {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-left: 6px;
-            vertical-align: middle;
+        .user-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 6px; vertical-align: middle; box-shadow: 0 0 4px rgba(0,0,0,0.4); }
+
+        /* Indicateurs de Position Haut/Bas */
+        .pos-indicator {
+            position: absolute; right: 30px; z-index: 200; display: none; padding: 5px 12px; 
+            border-radius: 20px; color: white; font-size: 11px; font-weight: bold; opacity: 0.9;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5); pointer-events: none; align-items: center; gap: 5px;
         }
+        #indicator-up { top: 40px; }
+        #indicator-down { bottom: 10px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
@@ -101,10 +123,16 @@
             <button class="btn-menu" style="background: #28a745;" id="btn-create" onclick="createSession()">🔗 Créer Session</button>
             <button class="btn-menu" style="background: #6f42c1;" id="btn-join" onclick="joinSession()">🤝 Rejoindre via Code</button>
             <button class="btn-menu" style="background: #a435b0;" onclick="exportProjectZip()">📥 Exporter (.zip)</button>
+            <button class="btn-menu" style="background: #e8a838; color: black;" onclick="runCurrentFile()">▶️ Exécuter (Run)</button>
             <span id="session-badge">SESSION : OFF</span>
             <strong id="current-file-title" style="color: #007acc; margin-left: 10px;">Aucun fichier</strong>
         </div>
         <div style="display: flex; align-items: center; gap: 10px;">
+            <select id="theme-select" onchange="toggleTheme(this.value)" style="background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); padding: 4px; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                <option value="dark">🌙 Sombre</option>
+                <option value="light">☀️ Clair</option>
+            </select>
+            <div id="users-list"></div>
             <span id="user-display" style="font-weight: bold; font-size: 13px; color: #4fc1ff;">Pseudo : ...</span>
             <span id="status">Déconnecté</span>
         </div>
@@ -118,9 +146,26 @@
             </div>
             <ul id="file-tree" class="tree-root"></ul>
         </div>
+        
         <div id="editor-container" style="display: flex; flex-direction: column;">
             <div id="tabs-container"></div>
-            <div id="editor" style="flex: 1; width: 100%; height: calc(100% - 35px);"></div>
+            
+            <div id="editor-wrapper" style="position: relative; flex: 1; width: 100%;">
+                <div id="indicator-up" class="pos-indicator">▲ <span class="name"></span></div>
+                <div id="indicator-down" class="pos-indicator">▼ <span class="name"></span></div>
+                <div id="editor" style="position: absolute; top:0; bottom:0; left:0; right:0;"></div>
+            </div>
+            
+            <div id="terminal-container" style="height: 180px; background: var(--bg-terminal); border-top: 1px solid var(--border-color); display: flex; flex-direction: column; font-family: 'Consolas', monospace;">
+                <div style="background: var(--bg-sidebar); padding: 5px 10px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; border-bottom: 1px solid var(--border-color);">
+                    Terminal Intégré (Partagé)
+                </div>
+                <div id="terminal-output" style="flex: 1; padding: 10px; overflow-y: auto; color: #00ff00; font-size: 13px; white-space: pre-wrap;">[Système] Prêt. Entrez une commande ci-dessous...</div>
+                <div style="display: flex; background: rgba(0,0,0,0.1); padding: 5px; align-items: center;">
+                    <span style="color: #00ff00; padding: 0 5px; font-weight: bold;">$</span>
+                    <input type="text" id="terminal-input" style="flex: 1; background: transparent; border: none; color: var(--text-main); outline: none; font-family: 'Consolas', monospace; font-size: 13px;" placeholder="Taper une commande système (ex: npm install, dir, python --version)..." onkeydown="handleTerminalSubmit(event)">
+                </div>
+            </div>
         </div>
     </div>
 
@@ -141,15 +186,26 @@
         let activeFileRelativePath = null;
         let isOwner = false;
         
-        // Nouvelles variables globales pour les onglets et le cache d'exportation
         let openTabs = [];
         let fileCache = {};
+        let remoteMice = {};
+        let cachedClientsData = []; // Pour stocker les infos de la room et gérer les indicateurs
 
         const langExtensions = {
             'python': 'py', 'c': 'c', 'cpp': 'cpp', 'java': 'java',
             'html': 'html', 'css': 'css', 'xml': 'xml', 'javascript': 'js',
             'json': 'json'
         };
+
+        function toggleTheme(theme) {
+            if (theme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'light');
+                if (editor) monaco.editor.setTheme('vs-light');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+                if (editor) monaco.editor.setTheme('vs-dark');
+            }
+        }
 
         require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs' }});
         
@@ -162,7 +218,6 @@
         };
 
         require(['vs/editor/editor.main'], function() {
-            // Initialisation attachée à l'élément interne #editor
             editor = monaco.editor.create(document.getElementById('editor'), {
                 value: "// Prêt. Importez un projet ou rejoignez une session.\n",
                 language: 'plaintext',
@@ -187,7 +242,7 @@
                 wsAddress = `wss://${serverURL}`;
                 console.log("Connexion automatique au tunnel : " + wsAddress);
             } else {
-                let manualURL = prompt("ENTRE LE LIEN DU TUNNEL (ex: xxxx.localtunnel.me) envoyé par ton pote :", "");
+                let manualURL = prompt("ENTRE LE LIEN DU TUNNEL envoyé par ton pote (ou laisse vide pour localhost):", "");
                 if (manualURL) {
                     manualURL = manualURL.replace("https://", "").replace("http://", "");
                     wsAddress = `wss://${manualURL}`;
@@ -203,6 +258,7 @@
 
             ws.onclose = () => { 
                 document.getElementById('status').innerText = "Serveur Déconnecté"; 
+                document.getElementById('users-list').innerHTML = ""; // Vider la liste
             };
 
             ws.onmessage = async (event) => {
@@ -243,11 +299,11 @@
                     }
                 }
                 else if (data.type === "file-content") {
-                    fileCache[data.filename] = data.text; // Alimentation du cache
+                    fileCache[data.filename] = data.text; 
                     openFileInTab(data.filename, data.text, data.forcedLang);
                 }
                 else if (data.type === "edit" && data.filename === activeFileRelativePath) {
-                    fileCache[data.filename] = data.text; // Alimentation du cache
+                    fileCache[data.filename] = data.text; 
                     isUpdatingFromServer = true;
                     const model = editor.getModel();
                     if (model && model.getValue() !== data.text) {
@@ -259,7 +315,6 @@
                     if (isOwner) await saveToLocalDisk(data.filename, data.text);
                 }
                 else if (data.type === "selection-sync" && data.filename === activeFileRelativePath) {
-                    // Synchronisation visuelle de la sélection du partenaire
                     const className = `remote-selection-${data.clientId}`;
                     if (!document.getElementById(className)) {
                         const style = document.createElement('style');
@@ -278,9 +333,11 @@
                     remoteSelections = editor.deltaDecorations(remoteSelections, newDecorations);
                 }
                 else if (data.type === "presence") { 
+                    cachedClientsData = data.clients; // Sauvegarde globale pour le scroll indicator
                     updateRemoteCursors(data.clients); 
+                    updateOnlineUsersList(data.clients); // MAJ du menu du haut
+                    updateRelativePositionIndicators(); // MAJ des flèches haut/bas
                     
-                    // Gestion des pastilles géolocalisées sur l'arbre de fichiers
                     document.querySelectorAll('.user-badge').forEach(el => el.remove());
                     data.clients.forEach(client => {
                         if (client.id === myId || !client.activeFile) return;
@@ -290,21 +347,73 @@
                                 const badge = document.createElement('span');
                                 badge.className = `user-badge badge-${client.id}`;
                                 badge.style.backgroundColor = client.color;
-                                badge.title = `L'utilisateur ${client.pseudo} lit ce fichier`;
+                                badge.title = `L'utilisateur ${client.pseudo} est ici`;
                                 target.appendChild(badge);
                             }
                         });
                     });
                 }
                 else if (data.type === "mouse-sync") {
-                    updateRemoteMousePointer(data);
+                    remoteMice[data.clientId] = data;
+                    renderRemoteMice();
                 }
                 else if (data.type === "mouse-leave") {
+                    delete remoteMice[data.clientId];
                     const pointer = document.getElementById(`mouse-${data.clientId}`);
                     if (pointer) pointer.remove();
                 }
+                else if (data.type === "terminal-output") {
+                    const outEl = document.getElementById('terminal-output');
+                    outEl.innerText += data.output;
+                    outEl.scrollTop = outEl.scrollHeight;
+                }
                 else if (data.type === "error") { alert(data.message); }
             };
+        }
+
+        // --- NOUVELLE FONCTION : Affichage de la liste des membres connectés ---
+        function updateOnlineUsersList(clients) {
+            const listContainer = document.getElementById('users-list');
+            listContainer.innerHTML = "";
+            const others = clients.filter(c => c.id !== myId);
+            others.forEach(user => {
+                const tag = document.createElement('div');
+                tag.className = "user-tag";
+                tag.style.backgroundColor = user.color;
+                tag.innerText = user.pseudo;
+                tag.title = user.activeFile ? `Travaille sur : ${user.activeFile}` : "Dans l'interface";
+                listContainer.appendChild(tag);
+            });
+        }
+
+        // --- NOUVELLE FONCTION : Indicateur visuel Hors-Ecran (Flèches) ---
+        function updateRelativePositionIndicators() {
+            const upInd = document.getElementById('indicator-up');
+            const downInd = document.getElementById('indicator-down');
+            upInd.style.display = 'none';
+            downInd.style.display = 'none';
+
+            if (!editor || !activeFileRelativePath || cachedClientsData.length <= 1) return;
+
+            const myRanges = editor.getVisibleRanges();
+            if (myRanges.length === 0) return;
+            const topVisibleLine = myRanges[0].startLineNumber;
+            const bottomVisibleLine = myRanges[0].endLineNumber;
+
+            cachedClientsData.forEach(client => {
+                if (client.id === myId || client.activeFile !== activeFileRelativePath || !client.cursor) return;
+                
+                const remoteLine = client.cursor.line;
+                if (remoteLine < topVisibleLine) {
+                    upInd.style.display = 'flex';
+                    upInd.style.backgroundColor = client.color;
+                    upInd.querySelector('.name').innerText = client.pseudo;
+                } else if (remoteLine > bottomVisibleLine) {
+                    downInd.style.display = 'flex';
+                    downInd.style.backgroundColor = client.color;
+                    downInd.querySelector('.name').innerText = client.pseudo;
+                }
+            });
         }
 
         async function openLocalFolder() {
@@ -409,6 +518,10 @@
             const badge = document.getElementById('session-badge');
             const hasActiveRoom = badge.style.display === "inline-block";
 
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ type: "file-switch", filePath: relativePath }));
+            }
+
             if (hasActiveRoom && ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({ 
                     type: "open-file", 
@@ -428,7 +541,6 @@
             }
         }
 
-        // --- ENCAPSULATION DE LA LOGIQUE DES ONGLETS ---
         function openFileInTab(filePath, text, language) {
             if (!openTabs.includes(filePath)) {
                 openTabs.push(filePath);
@@ -446,6 +558,7 @@
             }
             isUpdatingFromServer = false;
             remoteSelections = []; 
+            updateRelativePositionIndicators();
         }
 
         function renderTabs() {
@@ -484,6 +597,7 @@
                 }
             }
             renderTabs();
+            updateRelativePositionIndicators();
         }
 
         function setupEditorListeners() {
@@ -508,7 +622,6 @@
                 }
             });
 
-            // Écouteur de sélection de texte ajouté pour le partage
             editor.onDidChangeCursorSelection((e) => {
                 if (!activeFileRelativePath || isUpdatingFromServer) return;
                 if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
@@ -519,38 +632,84 @@
                     }));
                 }
             });
+
+            // Gère le dessin des souris collées au code et la visibilité des flèches au scroll
+            editor.onDidScrollChange(() => {
+                renderRemoteMice();
+                updateRelativePositionIndicators();
+            });
         }
 
         function trackAndSyncMouse(event) {
             if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
-                ws.send(JSON.stringify({
+                let payload = {
                     type: "mouse-move",
                     mouse: { x: event.clientX, y: event.clientY }
-                }));
+                };
+
+                // Accrochage intelligent de la souris si elle passe dans l'éditeur Monaco
+                if (editor && activeFileRelativePath) {
+                    const target = editor.getTargetAtClientPoint(event.clientX, event.clientY);
+                    if (target && target.position) {
+                        payload.editorPos = { line: target.position.lineNumber, column: target.position.column };
+                        payload.activeFile = activeFileRelativePath;
+                    }
+                }
+                ws.send(JSON.stringify(payload));
             }
         }
 
-        function updateRemoteMousePointer(data) {
+        function renderRemoteMice() {
             const layer = document.getElementById('mouse-layer');
-            let pointer = document.getElementById(`mouse-${data.clientId}`);
+            
+            for (const clientId in remoteMice) {
+                const data = remoteMice[clientId];
+                let pointer = document.getElementById(`mouse-${clientId}`);
 
-            if (!pointer) {
-                pointer = document.createElement('div');
-                pointer.id = `mouse-${data.clientId}`;
-                pointer.className = "fake-mouse-pointer";
-                pointer.style.color = data.color;
+                if (!pointer) {
+                    pointer = document.createElement('div');
+                    pointer.id = `mouse-${clientId}`;
+                    pointer.className = "fake-mouse-pointer";
+                    pointer.style.color = data.color;
 
-                const label = document.createElement('div');
-                label.className = "fake-mouse-label";
-                label.style.backgroundColor = data.color;
-                label.innerText = data.pseudo; 
-                pointer.appendChild(label);
+                    const label = document.createElement('div');
+                    label.className = "fake-mouse-label";
+                    label.style.backgroundColor = data.color;
+                    label.innerText = data.pseudo; 
+                    pointer.appendChild(label);
 
-                layer.appendChild(pointer);
+                    layer.appendChild(pointer);
+                }
+
+                let x = data.mouse.x;
+                let y = data.mouse.y;
+                pointer.style.display = 'block';
+
+                // Gestion intelligente de la souris : on la relie au texte
+                if (data.editorPos && data.activeFile === activeFileRelativePath) {
+                    const scrolledPos = editor.getScrolledVisiblePosition(new monaco.Position(data.editorPos.line, data.editorPos.column));
+                    
+                    if (scrolledPos) {
+                        const rect = editor.getDomNode().getBoundingClientRect();
+                        x = rect.left + scrolledPos.left;
+                        y = rect.top + scrolledPos.top;
+                        
+                        // Si l'utilisateur a scrollé loin, on cache la souris
+                        if (y < rect.top || y > rect.bottom || x < rect.left || x > rect.right) {
+                            pointer.style.display = 'none';
+                        }
+                    } else {
+                        pointer.style.display = 'none';
+                    }
+                } 
+                else if (data.editorPos && data.activeFile !== activeFileRelativePath) {
+                    // Cache la souris si l'autre user code dans un fichier différent du nôtre
+                    pointer.style.display = 'none';
+                }
+
+                pointer.style.left = `${x}px`;
+                pointer.style.top = `${y}px`;
             }
-
-            pointer.style.left = `${data.mouse.x}px`;
-            pointer.style.top = `${data.mouse.y}px`;
         }
 
         function syncTreeStructureToServer() {
@@ -743,7 +902,6 @@
                         className: `remote-cursor ${className}`, 
                         beforeContentClassName: `remote-cursor-tooltip ${className}`, 
                         beforeInjectedText: { text: client.pseudo },
-                        // AJOUT : Ajoute le curseur du pote dans la barre d'aperçu droite et dans la minimap
                         overviewRuler: { color: client.color, position: monaco.editor.OverviewRulerLane.Right },
                         minimap: { color: client.color, position: monaco.editor.MinimapPosition.Inline }
                     }
@@ -752,13 +910,36 @@
             remoteDecorations = editor.deltaDecorations(remoteDecorations, newDecorations);
         }
 
-        // --- EXPORTATION DU PROJET EN ENTIER (ZIP) ---
+        function runCurrentFile() {
+            if (!activeFileRelativePath) return alert("Aucun fichier actif à exécuter !");
+            if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
+                ws.send(JSON.stringify({ type: "run-file", filename: activeFileRelativePath }));
+            } else {
+                document.getElementById('terminal-output').innerText += "\n[Système] Ouvrez une session collaborative pour l'exécuter en ligne.";
+            }
+        }
+
+        function handleTerminalSubmit(event) {
+            if (event.key === "Enter") {
+                const inputEl = document.getElementById('terminal-input');
+                const command = inputEl.value.trim();
+                if (!command) return;
+
+                if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
+                    document.getElementById('terminal-output').innerText += `\n$ ${command}`;
+                    ws.send(JSON.stringify({ type: "terminal-command", command: command }));
+                    inputEl.value = "";
+                } else {
+                    alert("Connectez-vous à une session active pour utiliser la console.");
+                }
+            }
+        }
+
         async function exportProjectZip() {
             const zip = new JSZip();
             alert("Préparation de l'exportation au format ZIP...");
             
             if (isOwner && Object.keys(fileHandlesRegistry).length > 0) {
-                // Pour l'Hôte : On lit les fichiers réels du disque dur
                 for (const [path, handle] of Object.entries(fileHandlesRegistry)) {
                     try {
                         const file = await handle.getFile();
@@ -767,9 +948,8 @@
                     } catch(e) { console.error("Export erreur:", e); }
                 }
             } else {
-                // Pour le Client à distance : On exporte la totalité de la mémoire partagée
                 if (Object.keys(fileCache).length === 0) {
-                    alert("Aucun fichier stocké dans votre historique de session à exporter.");
+                    alert("Aucun fichier en cache à exporter.");
                     return;
                 }
                 for (const [path, text] of Object.entries(fileCache)) {
