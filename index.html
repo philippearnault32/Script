@@ -76,16 +76,26 @@
             pointer-events: none; z-index: 100; box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
 
-        /* Souris Volantes Plus Visibles (Forme Curseur) */
+        /* Souris Volantes Vectorielles en Vrai Mode Curseur SVG */
         .fake-mouse-pointer {
-            position: absolute; width: 0; height: 0;
-            border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 16px solid currentColor;
-            transform: rotate(-25deg); pointer-events: none; z-index: 9999; filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.5));
+            position: absolute; 
+            pointer-events: none; 
+            z-index: 10000; 
+            /* Transition fluide de 80ms pour lisser les saccades réseau */
+            transition: top 0.08s ease-out, left 0.08s ease-out; 
         }
         .fake-mouse-label {
-            position: absolute; top: 18px; left: 6px; color: white !important; font-size: 11px;
-            font-weight: bold; padding: 2px 6px; border-radius: 4px; background: currentColor; white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+            position: absolute; 
+            top: 16px; 
+            left: 12px; 
+            color: white !important; 
+            font-size: 11px;
+            font-weight: 600; 
+            padding: 3px 8px; 
+            border-radius: 4px; 
+            white-space: nowrap;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+            font-family: 'Segoe UI', sans-serif;
         }
 
         /* Onglets et Pastilles géolocalisées */
@@ -189,7 +199,7 @@
         let openTabs = [];
         let fileCache = {};
         let remoteMice = {};
-        let cachedClientsData = []; // Pour stocker les infos de la room et gérer les indicateurs
+        let cachedClientsData = []; 
 
         const langExtensions = {
             'python': 'py', 'c': 'c', 'cpp': 'cpp', 'java': 'java',
@@ -258,7 +268,7 @@
 
             ws.onclose = () => { 
                 document.getElementById('status').innerText = "Serveur Déconnecté"; 
-                document.getElementById('users-list').innerHTML = ""; // Vider la liste
+                document.getElementById('users-list').innerHTML = ""; 
             };
 
             ws.onmessage = async (event) => {
@@ -333,10 +343,10 @@
                     remoteSelections = editor.deltaDecorations(remoteSelections, newDecorations);
                 }
                 else if (data.type === "presence") { 
-                    cachedClientsData = data.clients; // Sauvegarde globale pour le scroll indicator
+                    cachedClientsData = data.clients; 
                     updateRemoteCursors(data.clients); 
-                    updateOnlineUsersList(data.clients); // MAJ du menu du haut
-                    updateRelativePositionIndicators(); // MAJ des flèches haut/bas
+                    updateOnlineUsersList(data.clients); 
+                    updateRelativePositionIndicators(); 
                     
                     document.querySelectorAll('.user-badge').forEach(el => el.remove());
                     data.clients.forEach(client => {
@@ -371,7 +381,6 @@
             };
         }
 
-        // --- NOUVELLE FONCTION : Affichage de la liste des membres connectés ---
         function updateOnlineUsersList(clients) {
             const listContainer = document.getElementById('users-list');
             listContainer.innerHTML = "";
@@ -386,7 +395,6 @@
             });
         }
 
-        // --- NOUVELLE FONCTION : Indicateur visuel Hors-Ecran (Flèches) ---
         function updateRelativePositionIndicators() {
             const upInd = document.getElementById('indicator-up');
             const downInd = document.getElementById('indicator-down');
@@ -633,7 +641,6 @@
                 }
             });
 
-            // Gère le dessin des souris collées au code et la visibilité des flèches au scroll
             editor.onDidScrollChange(() => {
                 renderRemoteMice();
                 updateRelativePositionIndicators();
@@ -647,7 +654,6 @@
                     mouse: { x: event.clientX, y: event.clientY }
                 };
 
-                // Accrochage intelligent de la souris si elle passe dans l'éditeur Monaco
                 if (editor && activeFileRelativePath) {
                     const target = editor.getTargetAtClientPoint(event.clientX, event.clientY);
                     if (target && target.position) {
@@ -659,6 +665,7 @@
             }
         }
 
+        // --- FONCTION MODIFIÉE : Rendu vectoriel du pointeur de souris avec inject SVG ---
         function renderRemoteMice() {
             const layer = document.getElementById('mouse-layer');
             
@@ -670,22 +677,23 @@
                     pointer = document.createElement('div');
                     pointer.id = `mouse-${clientId}`;
                     pointer.className = "fake-mouse-pointer";
-                    pointer.style.color = data.color;
-
-                    const label = document.createElement('div');
-                    label.className = "fake-mouse-label";
-                    label.style.backgroundColor = data.color;
-                    label.innerText = data.pseudo; 
-                    pointer.appendChild(label);
-
                     layer.appendChild(pointer);
                 }
+
+                // Intégration du tracé SVG propre dessiné à la couleur de l'utilisateur avec contour blanc
+                pointer.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: block;">
+                        <path d="M0 0V15L4.5 10.5H11L0 0Z" fill="${data.color}" stroke="#ffffff" stroke-width="1.5" stroke-linejoin="round"/>
+                    </svg>
+                    <div class="fake-mouse-label" style="background-color: ${data.color};">
+                        ${data.pseudo}
+                    </div>
+                `;
 
                 let x = data.mouse.x;
                 let y = data.mouse.y;
                 pointer.style.display = 'block';
 
-                // Gestion intelligente de la souris : on la relie au texte
                 if (data.editorPos && data.activeFile === activeFileRelativePath) {
                     const scrolledPos = editor.getScrolledVisiblePosition(new monaco.Position(data.editorPos.line, data.editorPos.column));
                     
@@ -694,7 +702,6 @@
                         x = rect.left + scrolledPos.left;
                         y = rect.top + scrolledPos.top;
                         
-                        // Si l'utilisateur a scrollé loin, on cache la souris
                         if (y < rect.top || y > rect.bottom || x < rect.left || x > rect.right) {
                             pointer.style.display = 'none';
                         }
@@ -703,7 +710,6 @@
                     }
                 } 
                 else if (data.editorPos && data.activeFile !== activeFileRelativePath) {
-                    // Cache la souris si l'autre user code dans un fichier différent du nôtre
                     pointer.style.display = 'none';
                 }
 
@@ -910,10 +916,15 @@
             remoteDecorations = editor.deltaDecorations(remoteDecorations, newDecorations);
         }
 
+        // --- FONCTION MODIFIÉE : Envoi direct du texte (code) pour exécution virtuelle ---
         function runCurrentFile() {
             if (!activeFileRelativePath) return alert("Aucun fichier actif à exécuter !");
             if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
-                ws.send(JSON.stringify({ type: "run-file", filename: activeFileRelativePath }));
+                ws.send(JSON.stringify({ 
+                    type: "run-file", 
+                    filename: activeFileRelativePath,
+                    text: editor.getValue() // Injection instantanée du code présent à l'écran
+                }));
             } else {
                 document.getElementById('terminal-output').innerText += "\n[Système] Ouvrez une session collaborative pour l'exécuter en ligne.";
             }
