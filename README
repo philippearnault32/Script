@@ -1,8 +1,3 @@
-Voici un texte complet, professionnel et structuré pour ton fichier **README.md**. Il explique clairement le projet, ses fonctionnalités et comment l'installer ou le déployer.
-
-Tu peux copier-coller le contenu ci-dessous directement dans ton fichier `README.md` (sur ton PC ou directement sur GitHub) :
-
-```markdown
 # 🚀 IDE Collaboratif Synchrone Pro
 
 Un environnement de développement intégré (IDE) léger, rapide et entièrement collaboratif en temps réel. Développez, partagez et codez à plusieurs instantanément, directement depuis votre navigateur.
@@ -33,8 +28,3 @@ Le projet est découpé en deux parties :
 
 ### Prérequis
 - [Node.js](https://nodejs.org/) (version 16 ou supérieure) installé sur votre machine.
-
-### Étape 1 : Cloner le projet
-```bash
-git clone [https://github.com/philippearnault32/Editeur-code-collaboratif.git](https://github.com/philippearnault32/Editeur-code-collaboratif.git)
-cd Editeur-code-collaboratif
