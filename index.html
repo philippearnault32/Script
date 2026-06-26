@@ -53,7 +53,44 @@
             position: absolute; top: 15px; left: 5px; color: white; font-size: 10px;
             font-weight: bold; padding: 1px 4px; border-radius: 3px; background: currentColor; white-space: nowrap;
         }
+
+        /* STYLES DES NOUVELLES FONCTIONNALITÉS (ONGLETS ET PASTILLES) */
+        #tabs-container { 
+            display: flex; 
+            background: #252526; 
+            border-bottom: 1px solid #3c3c3c; 
+            height: 35px; 
+            overflow-x: auto; 
+            align-items: center; 
+            padding-left: 5px;
+            gap: 2px;
+        }
+        .tab {
+            display: flex;
+            align-items: center;
+            background: #2d2d2d;
+            color: #969696;
+            padding: 0 12px;
+            height: 100%;
+            border-right: 1px solid #252526;
+            cursor: pointer;
+            user-select: none;
+            font-size: 13px;
+        }
+        .tab.active { background: #1e1e1e; color: #fff; border-top: 2px solid #007acc; }
+        .tab .close-tab { margin-left: 8px; color: #888; cursor: pointer; font-size: 11px; }
+        .tab .close-tab:hover { color: #ff4545; }
+
+        .user-badge {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.39.0/min/vs/loader.min.js"></script>
 </head>
 <body>
@@ -63,6 +100,7 @@
             <button class="btn-menu" id="btn-import" onclick="openLocalFolder()">📁 Importer Projet</button>
             <button class="btn-menu" style="background: #28a745;" id="btn-create" onclick="createSession()">🔗 Créer Session</button>
             <button class="btn-menu" style="background: #6f42c1;" id="btn-join" onclick="joinSession()">🤝 Rejoindre via Code</button>
+            <button class="btn-menu" style="background: #a435b0;" onclick="exportProjectZip()">📥 Exporter (.zip)</button>
             <span id="session-badge">SESSION : OFF</span>
             <strong id="current-file-title" style="color: #007acc; margin-left: 10px;">Aucun fichier</strong>
         </div>
@@ -80,7 +118,10 @@
             </div>
             <ul id="file-tree" class="tree-root"></ul>
         </div>
-        <div id="editor-container"></div>
+        <div id="editor-container" style="display: flex; flex-direction: column;">
+            <div id="tabs-container"></div>
+            <div id="editor" style="flex: 1; width: 100%; height: calc(100% - 35px);"></div>
+        </div>
     </div>
 
     <div id="mouse-layer" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:999;"></div>
@@ -91,6 +132,7 @@
         let myId;
         let myPseudo = "Anonyme";
         let remoteDecorations = [];
+        let remoteSelections = [];
         let isUpdatingFromServer = false;
         
         let rootHandle = null;
@@ -98,6 +140,10 @@
         let folderHandlesRegistry = {}; 
         let activeFileRelativePath = null;
         let isOwner = false;
+        
+        // Nouvelles variables globales pour les onglets et le cache d'exportation
+        let openTabs = [];
+        let fileCache = {};
 
         const langExtensions = {
             'python': 'py', 'c': 'c', 'cpp': 'cpp', 'java': 'java',
@@ -116,7 +162,8 @@
         };
 
         require(['vs/editor/editor.main'], function() {
-            editor = monaco.editor.create(document.getElementById('editor-container'), {
+            // Initialisation attachée à l'élément interne #editor
+            editor = monaco.editor.create(document.getElementById('editor'), {
                 value: "// Prêt. Importez un projet ou rejoignez une session.\n",
                 language: 'plaintext',
                 theme: 'vs-dark',
@@ -134,17 +181,14 @@
         function setupWebSocket() {
             const urlParams = new URLSearchParams(window.location.search);
             let serverURL = urlParams.get('tunnel');
-
-            let wsAddress = "ws://localhost:8080"; // Adresse par défaut pour toi l'hôte
+            let wsAddress = "ws://localhost:8080";
 
             if (serverURL) {
                 wsAddress = `wss://${serverURL}`;
                 console.log("Connexion automatique au tunnel : " + wsAddress);
             } else {
-                // 🟢 C'est cette case qui va s'ouvrir chez ton pote s'il lance index.html sans paramètre URL !
                 let manualURL = prompt("ENTRE LE LIEN DU TUNNEL (ex: xxxx.localtunnel.me) envoyé par ton pote :", "");
                 if (manualURL) {
-                    // Nettoyage au cas où il colle le lien entier avec le https://
                     manualURL = manualURL.replace("https://", "").replace("http://", "");
                     wsAddress = `wss://${manualURL}`;
                 }
@@ -153,7 +197,7 @@
             ws = new WebSocket(wsAddress);
 
             ws.onopen = () => { 
-                document.getElementById('status').innerText = "Serveur Connecté"; 
+                document.getElementById('status').innerText = "Serveur Connected"; 
                 ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
             };
 
@@ -199,19 +243,11 @@
                     }
                 }
                 else if (data.type === "file-content") {
-                    activeFileRelativePath = data.filename;
-                    document.getElementById('current-file-title').innerText = data.filename;
-                    applyActiveStyleToTree(data.filename);
-
-                    isUpdatingFromServer = true;
-                    const model = editor.getModel();
-                    if (model) {
-                        model.setValue(data.text);
-                        monaco.editor.setModelLanguage(model, data.forcedLang || 'plaintext');
-                    }
-                    isUpdatingFromServer = false;
+                    fileCache[data.filename] = data.text; // Alimentation du cache
+                    openFileInTab(data.filename, data.text, data.forcedLang);
                 }
                 else if (data.type === "edit" && data.filename === activeFileRelativePath) {
+                    fileCache[data.filename] = data.text; // Alimentation du cache
                     isUpdatingFromServer = true;
                     const model = editor.getModel();
                     if (model && model.getValue() !== data.text) {
@@ -222,8 +258,43 @@
                     isUpdatingFromServer = false;
                     if (isOwner) await saveToLocalDisk(data.filename, data.text);
                 }
+                else if (data.type === "selection-sync" && data.filename === activeFileRelativePath) {
+                    // Synchronisation visuelle de la sélection du partenaire
+                    const className = `remote-selection-${data.clientId}`;
+                    if (!document.getElementById(className)) {
+                        const style = document.createElement('style');
+                        style.id = className;
+                        style.innerHTML = `.${className} { background-color: ${data.color}40 !important; }`;
+                        document.head.appendChild(style);
+                    }
+                    const newDecorations = [{
+                        range: new monaco.Range(data.selection.startLineNumber, data.selection.startColumn, data.selection.endLineNumber, data.selection.endColumn),
+                        options: {
+                            className: className,
+                            overviewRuler: { color: data.color, position: monaco.editor.OverviewRulerLane.Right },
+                            minimap: { color: data.color, position: monaco.editor.MinimapPosition.Inline }
+                        }
+                    }];
+                    remoteSelections = editor.deltaDecorations(remoteSelections, newDecorations);
+                }
                 else if (data.type === "presence") { 
                     updateRemoteCursors(data.clients); 
+                    
+                    // Gestion des pastilles géolocalisées sur l'arbre de fichiers
+                    document.querySelectorAll('.user-badge').forEach(el => el.remove());
+                    data.clients.forEach(client => {
+                        if (client.id === myId || !client.activeFile) return;
+                        const targets = document.querySelectorAll(`[data-path="${client.activeFile}"]`);
+                        targets.forEach(target => {
+                            if (!target.querySelector(`.badge-${client.id}`)) {
+                                const badge = document.createElement('span');
+                                badge.className = `user-badge badge-${client.id}`;
+                                badge.style.backgroundColor = client.color;
+                                badge.title = `L'utilisateur ${client.pseudo} lit ce fichier`;
+                                target.appendChild(badge);
+                            }
+                        });
+                    });
                 }
                 else if (data.type === "mouse-sync") {
                     updateRemoteMousePointer(data);
@@ -241,7 +312,7 @@
                 rootHandle = await window.showDirectoryPicker();
                 fileHandlesRegistry = {};
                 folderHandlesRegistry = {};
-                isOwner = true; // L'utilisateur qui importe devient le gestionnaire local des fichiers
+                isOwner = true; 
                 await refreshTreeUI();
             } catch (err) { console.error(err); }
         }
@@ -335,13 +406,9 @@
 
         async function requestOpenFile(relativePath, language) {
             activeFileRelativePath = relativePath;
-            document.getElementById('current-file-title').innerText = relativePath;
-            applyActiveStyleToTree(relativePath);
-
             const badge = document.getElementById('session-badge');
             const hasActiveRoom = badge.style.display === "inline-block";
 
-            // S'il y a une room active, on passe par le protocole synchrone du serveur
             if (hasActiveRoom && ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({ 
                     type: "open-file", 
@@ -349,28 +416,81 @@
                     forcedLang: language 
                 }));
             } else {
-                // Mode hors-ligne / Pré-session : On lit et injecte directement le fichier localement
                 const handle = fileHandlesRegistry[relativePath];
                 if (handle) {
                     try {
                         const file = await handle.getFile();
                         const text = await file.text();
-                        isUpdatingFromServer = true;
-                        const model = editor.getModel();
-                        if (model) {
-                            model.setValue(text);
-                            monaco.editor.setModelLanguage(model, language);
-                        }
-                        isUpdatingFromServer = false;
+                        fileCache[relativePath] = text;
+                        openFileInTab(relativePath, text, language);
                     } catch(e) { console.error("Erreur de lecture locale :", e); }
                 }
             }
+        }
+
+        // --- ENCAPSULATION DE LA LOGIQUE DES ONGLETS ---
+        function openFileInTab(filePath, text, language) {
+            if (!openTabs.includes(filePath)) {
+                openTabs.push(filePath);
+            }
+            activeFileRelativePath = filePath;
+            document.getElementById('current-file-title').innerText = filePath;
+            applyActiveStyleToTree(filePath);
+            renderTabs();
+
+            isUpdatingFromServer = true;
+            const model = editor.getModel();
+            if (model) {
+                model.setValue(text);
+                monaco.editor.setModelLanguage(model, language || 'plaintext');
+            }
+            isUpdatingFromServer = false;
+            remoteSelections = []; 
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+            openTabs.forEach(track => {
+                const isActive = track === activeFileRelativePath;
+                const tabEl = document.createElement('div');
+                tabEl.className = `tab ${isActive ? 'active' : ''}`;
+                
+                const fileName = track.split('/').pop();
+                tabEl.innerHTML = `<span>${fileName}</span><span class="close-tab" onclick="closeTab('${track}', event)">✕</span>`;
+                
+                tabEl.onclick = () => {
+                    if (track !== activeFileRelativePath) {
+                        requestOpenFile(track, 'plaintext');
+                    }
+                };
+                container.appendChild(tabEl);
+            });
+        }
+
+        function closeTab(filePath, event) {
+            event.stopPropagation();
+            openTabs = openTabs.filter(t => t !== filePath);
+            if (activeFileRelativePath === filePath) {
+                if (openTabs.length > 0) {
+                    requestOpenFile(openTabs[openTabs.length - 1], 'plaintext');
+                } else {
+                    isUpdatingFromServer = true;
+                    editor.getModel().setValue("");
+                    isUpdatingFromServer = false;
+                    activeFileRelativePath = null;
+                    document.getElementById('current-file-title').innerText = "Aucun fichier";
+                    applyActiveStyleToTree(null);
+                }
+            }
+            renderTabs();
         }
 
         function setupEditorListeners() {
             editor.onDidChangeModelContent(() => {
                 if (isUpdatingFromServer || !activeFileRelativePath) return;
                 const text = editor.getValue();
+                fileCache[activeFileRelativePath] = text;
                 
                 if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
                     ws.send(JSON.stringify({ type: "edit", filename: activeFileRelativePath, text: text }));
@@ -384,6 +504,18 @@
                     ws.send(JSON.stringify({
                         type: "cursor",
                         position: { line: e.position.lineNumber, column: e.position.column }
+                    }));
+                }
+            });
+
+            // Écouteur de sélection de texte ajouté pour le partage
+            editor.onDidChangeCursorSelection((e) => {
+                if (!activeFileRelativePath || isUpdatingFromServer) return;
+                if (ws && ws.readyState === 1 && document.getElementById('session-badge').style.display === "inline-block") {
+                    ws.send(JSON.stringify({
+                        type: "selection-change",
+                        filename: activeFileRelativePath,
+                        selection: e.selection
                     }));
                 }
             });
@@ -441,7 +573,7 @@
                         const subUl = child.querySelector('.folder-children');
                         if (subUl) nodeData.children = serializeTreeStructure(subUl);
                         nodes.push(nodeData); 
-                    } else if (child.classList.contains('tree-file')) { // CORRECTION ICI : Analyse de la classe de l'élément parent LI
+                    } else if (child.classList.contains('tree-file')) { 
                         nodeData.type = "file";
                         nodeData.name = child.innerText.trim();
                         nodeData.path = child.dataset.path; 
@@ -551,7 +683,6 @@
                     filename: fullFilename
                 }));
             } else {
-                // Création locale immédiate si hors-ligne
                 createFileLocally(parentPath, fullFilename);
             }
         }
@@ -577,7 +708,7 @@
             } catch (e) { console.error(e); }
         }
 
-        async function triggerSearch() {
+        function triggerSearch() {
             const query = document.getElementById('search-input').value.toLowerCase().trim();
             document.querySelectorAll('.tree-file').forEach(el => el.classList.remove('search-match'));
             if (!query) return;
@@ -611,11 +742,46 @@
                     options: { 
                         className: `remote-cursor ${className}`, 
                         beforeContentClassName: `remote-cursor-tooltip ${className}`, 
-                        beforeInjectedText: { text: client.pseudo } 
+                        beforeInjectedText: { text: client.pseudo },
+                        // AJOUT : Ajoute le curseur du pote dans la barre d'aperçu droite et dans la minimap
+                        overviewRuler: { color: client.color, position: monaco.editor.OverviewRulerLane.Right },
+                        minimap: { color: client.color, position: monaco.editor.MinimapPosition.Inline }
                     }
                 });
             });
             remoteDecorations = editor.deltaDecorations(remoteDecorations, newDecorations);
+        }
+
+        // --- EXPORTATION DU PROJET EN ENTIER (ZIP) ---
+        async function exportProjectZip() {
+            const zip = new JSZip();
+            alert("Préparation de l'exportation au format ZIP...");
+            
+            if (isOwner && Object.keys(fileHandlesRegistry).length > 0) {
+                // Pour l'Hôte : On lit les fichiers réels du disque dur
+                for (const [path, handle] of Object.entries(fileHandlesRegistry)) {
+                    try {
+                        const file = await handle.getFile();
+                        const text = await file.text();
+                        zip.file(path, text);
+                    } catch(e) { console.error("Export erreur:", e); }
+                }
+            } else {
+                // Pour le Client à distance : On exporte la totalité de la mémoire partagée
+                if (Object.keys(fileCache).length === 0) {
+                    alert("Aucun fichier stocké dans votre historique de session à exporter.");
+                    return;
+                }
+                for (const [path, text] of Object.entries(fileCache)) {
+                    zip.file(path, text);
+                }
+            }
+            
+            const blob = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "projet-collaboratif-export.zip";
+            link.click();
         }
     </script>
 </body>
