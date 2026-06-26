@@ -1,4 +1,4 @@
-# 🚀 IDE Collaboratif Synchrone Pro
+# 🚀 IDE Collaboratif Synchrone Pro (Autohébérgé)
 
 Un environnement de développement intégré (IDE) léger, rapide et entièrement collaboratif en temps réel. Développez, partagez et codez à plusieurs instantanément, directement depuis votre navigateur.
 
@@ -16,15 +16,18 @@ Le projet utilise **Monaco Editor** (le moteur derrière VS Code) pour le fronte
 
 ---
 
-## 🛠️ Architecture Technique
+## 🛠️ Comment ça marche ?
 
-Le projet est découpé en deux parties :
-1. **Frontend (`index.html`)** : Interface utilisateur utilisant l'éditeur Monaco de Microsoft. Hébergé de manière statique (par exemple sur *GitHub Pages*).
-2. **Backend (`backend.js`)** : Serveur Node.js gérant les salons (rooms) et redistribuant les événements de modification et de présence. Hébergé sur *Railway*.
+Lorsque vous lancez le script de démarrage (`demarrer.bat` ou `demarrer.sh`), trois actions s'exécutent automatiquement en arrière-plan :
+1. **Le Backend** (`backend.js`) démarre en local sur votre machine (port 8080).
+2. **Le Tunnel** (`localtunnel`) s'ouvre pour générer une adresse web publique temporaire (ex: `https://heavy-cats-run.loca.lt`) pointant vers votre port 8080.
+3. **Le Frontend** (`index.html`) s'ouvre automatiquement dans votre navigateur par défaut.
 
 ---
 
-## 🚀 Installation Locale
+## 🚀 Lancement Rapide (Zéro Configuration)
 
-### Prérequis
-- [Node.js](https://nodejs.org/) (version 16 ou supérieure) installé sur votre machine.
+### Étape 1 : Prérequis (À ne faire qu'une seule fois)
+Assurez-vous d'avoir installé [Node.js](https://nodejs.org/). Ouvrez votre terminal dans ce dossier et installez la dépendance de tunneling :
+```bash
+npm install localtunnel
