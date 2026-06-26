@@ -132,12 +132,29 @@
         });
 
         function setupWebSocket() {
-            ws = new WebSocket('wss://editeur-code-collaboratif-production.up.railway.app');
-            ws.onopen = () => { 
-                document.getElementById('status').innerText = "Serveur Connected"; 
-                ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
-            };
-            ws.onclose = () => { document.getElementById('status').innerText = "Serveur Déconnecté"; };
+        // Le script te demande l'adresse fournie par le tunnel dans ta console
+        let serverURL = prompt("Entrez l'adresse du tunnel Localtunnel (ex: heavy-cats-run.loca.lt) ou laissez vide pour localhost :", "");
+    
+        let wsAddress = "ws://localhost:8080"; // Par défaut si on est tout seul en local
+    
+        if (serverURL) {
+            // Nettoyage au cas où tu as collé le https:// au lieu de wss://
+            serverURL = serverURL.replace("https://", "").replace("http://", "");
+            wsAddress = `wss://${serverURL}`;
+        }
+
+        ws = new WebSocket(wsAddress);
+
+        ws.onopen = () => { 
+            document.getElementById('status').innerText = "Serveur Connecté"; 
+            ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
+        };
+    
+        ws.onclose = () => { 
+            document.getElementById('status').innerText = "Serveur Déconnecté"; 
+        };
+
+        // ... (Garde tout le reste de ton code ws.onmessage inchangé ici)
 
             ws.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
