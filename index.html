@@ -132,29 +132,38 @@
         });
 
         function setupWebSocket() {
-        // Le script te demande l'adresse fournie par le tunnel dans ta console
-        let serverURL = prompt("Entrez l'adresse du tunnel Localtunnel (ex: heavy-cats-run.loca.lt) ou laissez vide pour localhost :", "");
+        // 1. On analyse l'URL de la page pour voir si le script a donne un tunnel
+            const urlParams = new URLSearchParams(window.location.search);
+            let serverURL = urlParams.get('tunnel');
     
-        let wsAddress = "ws://localhost:8080"; // Par défaut si on est tout seul en local
+            let wsAddress = "ws://localhost:8080"; // Adresse par defaut
+
+            // 2. Si le script a transmis le tunnel automatiquement
+            if (serverURL) {
+                wsAddress = `wss://${serverURL}`;
+                console.log("Connexion automatique au tunnel : " + wsAddress);
+            } else {
+                // Option de secours au cas ou l'ami ouvre le fichier HTML directement sans le script
+                let manualURL = prompt("Entrez l'adresse du tunnel fournie par l'hote (ou laissez vide pour localhost) :", "");
+                if (manualURL) {
+                    manualURL = manualURL.replace("https://", "").replace("http://", "");
+                    wsAddress = `wss://${manualURL}`;
+                }
+            }
+
+            // 3. Connexion au WebSocket
+            ws = new WebSocket(wsAddress);
+
+            ws.onopen = () => { 
+                document.getElementById('status').innerText = "Serveur Connecté"; 
+                ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
+            };
     
-        if (serverURL) {
-            // Nettoyage au cas où tu as collé le https:// au lieu de wss://
-            serverURL = serverURL.replace("https://", "").replace("http://", "");
-            wsAddress = `wss://${serverURL}`;
-        }
+            ws.onclose = () => { 
+                document.getElementById('status').innerText = "Serveur Déconnecté"; 
+            };
 
-        ws = new WebSocket(wsAddress);
-
-        ws.onopen = () => { 
-            document.getElementById('status').innerText = "Serveur Connecté"; 
-            ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
-        };
-    
-        ws.onclose = () => { 
-            document.getElementById('status').innerText = "Serveur Déconnecté"; 
-        };
-
-        // ... (Garde tout le reste de ton code ws.onmessage inchangé ici)
+            // ... (Laisse tout ton code ws.onmessage en dessous inchangé)
 
             ws.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
