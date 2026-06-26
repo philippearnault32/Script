@@ -133,6 +133,43 @@ wss.on('connection', (ws) => {
                         broadcastToRoom(clientMeta.room, ws, { type: "mouse-sync", clientId: clientMeta.id, pseudo: clientMeta.pseudo, color: clientMeta.color, mouse: data.mouse });
                     }
                     break;
+
+                case "file-switch":
+                    if (clientMeta.room && rooms[clientMeta.room]) {
+                        clientMeta.activeFile = data.filePath; // Met à jour le fichier actif du user
+                        // Informe tout le monde du changement pour mettre à jour les pastilles colorées
+                        broadcastToRoom(clientMeta.room, null, { 
+                        type: "presence", 
+                        clients: getRoomClients(clientMeta.room) 
+                    });
+                    }
+                    break;
+
+                case "selection-change":
+                    if (clientMeta.room && rooms[clientMeta.room]) {
+                        // Envoie la sélection aux autres utilisateurs de la room
+                        broadcastToRoom(clientMeta.room, ws, {
+                        type: "selection-sync",
+                        clientId: clientMeta.id,
+                        color: clientMeta.color,
+                        filePath: clientMeta.activeFile,
+                        selection: data.selection
+                    });
+                    }
+                    break;
+
+                case "selection-change":
+                    if (clientMeta.room && rooms[clientMeta.room]) {
+                        // Renvoie la sélection de texte à tout le monde
+                        broadcastToRoom(clientMeta.room, ws, {
+                        type: "selection-sync",
+                        clientId: clientMeta.id,
+                        color: clientMeta.color,
+                        filename: data.filename,
+                        selection: data.selection
+                    });
+                    }
+                    break;
             }
         } catch (e) { console.error(e); }
     });
