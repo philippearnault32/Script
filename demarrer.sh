@@ -1,32 +1,49 @@
 #!/bin/bash
 
-# Couleurs pour les messages dans le terminal
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # Pas de couleur
+# Dépendance système requise sous Linux pour le presse-papiers : xclip ou xsel
+# Si vous êtes sur Ubuntu/Debian : sudo apt-get install xclip
 
-echo -e "${BLUE}=== IDE Collaboratif - Script de démarrage ===${NC}"
+PORT=8080
 
-# 1. Vérification de la présence de Node.js
-if ! command -v node &> /dev/null
-then
-    echo -e "${RED}[Erreur] Node.js n'est pas installé sur cette machine.${NC}"
-    echo "Veuillez l'installer pour lancer le serveur."
-    exit 1
+echo "=== Lancement du serveur Backend ==="
+node backend.js &
+SERVER_PID=$!
+
+# Attendre 1 seconde que le serveur s'initialise
+sleep 1
+
+echo "=== Création du tunnel public (Localtunnel) ==="
+# On installe localtunnel localement si absent
+if ! npx lt --version &> /dev/null; then
+    echo "Installation temporaire de localtunnel..."
 fi
 
-# 2. Vérification et installation automatique des dépendances
-if [ ! -d "node_modules/ws" ]; then
-    echo -e "${BLUE}[Info] Dépendance 'ws' manquante. Installation en cours...${NC}"
-    npm install ws
-    if [ $? -ne 0 ]; then
-        echo -e "${RED}[Erreur] Échec de l'installation des dépendances.${NC}"
-        exit 1
+# Lancement du tunnel et capture de l'URL
+URL=$(npx lt --port $PORT --print-requests | head -n 1 | grep -o 'https://[^ ]*')
+
+if [ -z "$URL" ]; then
+    # Deuxième tentative de capture si la première a été trop rapide
+    sleep 2
+    URL=$(npx lt --port $PORT | grep -o 'https://[^ ]*')
+fi
+
+if [ ! -z "$URL" ]; then
+    echo -e "\n\n==============================================="
+    echo -e "🔗 URL de votre espace de travail : \033[0;32m$URL\033[0m"
+    echo -e "📋 L'URL a été COPIÉE automatiquement dans votre presse-papiers !"
+    echo -e "===============================================\n"
+    
+    # Copie dans le presse-papiers selon l'OS
+    if command -v pbcopy &> /dev/null; then
+        echo -n "$URL" | pbcopy # Mac
+    elif command -v xclip &> /dev/null; then
+        echo -n "$URL" | xclip -selection clipboard # Linux
+    elif command -v xsel &> /dev/null; then
+        echo -n "$URL" | xsel --clipboard --input # Linux alternatif
     fi
-    echo -e "${GREEN}[Succès] Dépendances installées avec succès.${NC}"
+else
+    echo "Impossible de récupérer l'URL du tunnel automatiquement."
 fi
 
-# 3. Lancement du serveur backend
-echo -e "${GREEN}[Serveur] Lancement du backend...${NC}"
-node backend.js
+# Maintenir le script parent actif pour le serveur
+wait $SERVER_PID
