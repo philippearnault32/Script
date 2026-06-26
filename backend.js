@@ -1,14 +1,14 @@
 const { WebSocketServer } = require('ws');
+const { exec } = require('child_process');
 
-// 🟢 AJOUT : Déclaration obligatoire des clients et salons
-const clients = new Map(); 
-const rooms = {};          
-
-// Railway va injecter la variable process.env.PORT
+// Railway ou un autre hébergeur va injecter la variable process.env.PORT
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port: port });
 
 console.log(`=== SERVEUR EN LIGNE SUR LE PORT ${port} ===`);
+
+const clients = new Map();
+const rooms = {};
 
 wss.on('connection', (ws) => {
     clients.set(ws, { 
@@ -45,25 +45,23 @@ wss.on('connection', (ws) => {
                     break;
 
                 case "join-room":
-                    const targetRoom = data.roomCode.toUpperCase();
-                    if (rooms[targetRoom]) {
-                        rooms[targetRoom].clients.push(ws);
-                        clientMeta.room = targetRoom;
-                        
+                    const code = data.roomCode.toUpperCase().trim();
+                    if (rooms[code]) {
+                        rooms[code].clients.push(ws);
+                        clientMeta.room = code;
                         ws.send(JSON.stringify({ 
                             type: "room-joined", 
-                            roomCode: targetRoom, 
-                            treeHTML: rooms[targetRoom].filesStructure 
+                            roomCode: code, 
+                            treeHTML: rooms[code].filesStructure 
                         }));
-
-                        broadcastToRoom(targetRoom, null, { type: "presence", clients: getRoomClients(targetRoom) });
+                        broadcastToRoom(code, null, { type: "presence", clients: getRoomClients(code) });
                     } else {
-                        ws.send(JSON.stringify({ type: "error", message: "Code de session invalide !" }));
+                        ws.send(JSON.stringify({ type: "error", message: "Code de session introuvable !" }));
                     }
                     break;
 
                 case "sync-tree":
-                    if (clientMeta.room && rooms[clientMeta.room]) {
+                    if (clientMeta.room && rooms[clientMeta.room] && rooms[clientMeta.room].owner === ws) {
                         rooms[clientMeta.room].filesStructure = data.treeHTML;
                         broadcastToRoom(clientMeta.room, ws, { type: "tree-updated", treeHTML: data.treeHTML });
                     }
@@ -71,10 +69,11 @@ wss.on('connection', (ws) => {
 
                 case "request-create-file":
                     if (clientMeta.room && rooms[clientMeta.room]) {
-                        rooms[clientMeta.room].owner.send(JSON.stringify({
-                            type: "cmd-create-file",
-                            parentPath: data.parentPath,
-                            filename: data.filename
+                        const ownerWs = rooms[clientMeta.room].owner;
+                        ownerWs.send(JSON.stringify({ 
+                            type: "cmd-create-file", 
+                            parentPath: data.parentPath, 
+                            filename: data.filename 
                         }));
                     }
                     break;
@@ -82,22 +81,24 @@ wss.on('connection', (ws) => {
                 case "open-file":
                     if (clientMeta.room && rooms[clientMeta.room]) {
                         clientMeta.activeFile = data.filename;
+                        const cache = rooms[clientMeta.room].fileContents[data.filename];
                         
-                        if (rooms[clientMeta.room].fileContents[data.filename] !== undefined) {
-                            ws.send(JSON.stringify({
-                                type: "file-content",
-                                filename: data.filename,
-                                forcedLang: data.forcedLang,
-                                text: rooms[clientMeta.room].fileContents[data.filename]
+                        if (cache !== undefined) {
+                            ws.send(JSON.stringify({ 
+                                type: "file-content", 
+                                filename: data.filename, 
+                                forcedLang: data.forcedLang, 
+                                text: cache 
                             }));
+                            broadcastToRoom(clientMeta.room, null, { type: "presence", clients: getRoomClients(clientMeta.room) });
                         } else {
-                            rooms[clientMeta.room].owner.send(JSON.stringify({ 
+                            const ownerWs = rooms[clientMeta.room].owner;
+                            ownerWs.send(JSON.stringify({ 
                                 type: "request-file-content", 
-                                filename: data.filename,
+                                filename: data.filename, 
                                 forcedLang: data.forcedLang 
                             }));
                         }
-                        broadcastToRoom(clientMeta.room, null, { type: "presence", clients: getRoomClients(clientMeta.room) });
                     }
                     break;
 
@@ -110,64 +111,100 @@ wss.on('connection', (ws) => {
                             forcedLang: data.forcedLang, 
                             text: data.text 
                         });
+                        broadcastToRoom(clientMeta.room, null, { type: "presence", clients: getRoomClients(clientMeta.room) });
                     }
                     break;
 
                 case "edit":
                     if (clientMeta.room && rooms[clientMeta.room]) {
                         rooms[clientMeta.room].fileContents[data.filename] = data.text;
-                        broadcastToRoom(clientMeta.room, ws, { type: "edit", filename: data.filename, text: data.text });
+                        broadcastToRoom(clientMeta.room, ws, { 
+                            type: "edit", 
+                            filename: data.filename, 
+                            text: data.text 
+                        });
                     }
                     break;
 
                 case "cursor":
                     if (clientMeta.room && rooms[clientMeta.room]) {
                         clientMeta.cursor = data.position;
-                        broadcastToRoom(clientMeta.room, null, { type: "presence", clients: getRoomClients(clientMeta.room) });
+                        broadcastToRoom(clientMeta.room, ws, { type: "presence", clients: getRoomClients(clientMeta.room) });
                     }
                     break;
 
                 case "mouse-move":
                     if (clientMeta.room && rooms[clientMeta.room]) {
                         clientMeta.mouse = data.mouse;
-                        broadcastToRoom(clientMeta.room, ws, { type: "mouse-sync", clientId: clientMeta.id, pseudo: clientMeta.pseudo, color: clientMeta.color, mouse: data.mouse });
+                        broadcastToRoom(clientMeta.room, ws, { 
+                            type: "mouse-sync", 
+                            clientId: clientMeta.id, 
+                            pseudo: clientMeta.pseudo, 
+                            color: clientMeta.color, 
+                            mouse: data.mouse,
+                            editorPos: data.editorPos, // Ajout de la position dans le code
+                            activeFile: data.activeFile // Ajout du fichier sur lequel la souris se trouve
+                        });
                     }
                     break;
 
                 case "file-switch":
                     if (clientMeta.room && rooms[clientMeta.room]) {
-                        clientMeta.activeFile = data.filePath; // Met à jour le fichier actif du user
-                        // Informe tout le monde du changement pour mettre à jour les pastilles colorées
+                        clientMeta.activeFile = data.filePath;
                         broadcastToRoom(clientMeta.room, null, { 
-                        type: "presence", 
-                        clients: getRoomClients(clientMeta.room) 
-                    });
+                            type: "presence", 
+                            clients: getRoomClients(clientMeta.room) 
+                        });
                     }
                     break;
 
                 case "selection-change":
                     if (clientMeta.room && rooms[clientMeta.room]) {
-                        // Envoie la sélection aux autres utilisateurs de la room
                         broadcastToRoom(clientMeta.room, ws, {
-                        type: "selection-sync",
-                        clientId: clientMeta.id,
-                        color: clientMeta.color,
-                        filePath: clientMeta.activeFile,
-                        selection: data.selection
-                    });
+                            type: "selection-sync",
+                            clientId: clientMeta.id,
+                            color: clientMeta.color,
+                            filename: data.filename,
+                            selection: data.selection
+                        });
                     }
                     break;
 
-                case "selection-change":
+                case "terminal-command":
                     if (clientMeta.room && rooms[clientMeta.room]) {
-                        // Renvoie la sélection de texte à tout le monde
-                        broadcastToRoom(clientMeta.room, ws, {
-                        type: "selection-sync",
-                        clientId: clientMeta.id,
-                        color: clientMeta.color,
-                        filename: data.filename,
-                        selection: data.selection
-                    });
+                        exec(data.command, { cwd: process.cwd() }, (error, stdout, stderr) => {
+                            const output = stdout || stderr || (error ? error.message : "Commande exécutée sans retour.");
+                            broadcastToRoom(clientMeta.room, null, {
+                                type: "terminal-output",
+                                output: `\n${output}\n`
+                            });
+                        });
+                    }
+                    break;
+
+                case "run-file":
+                    if (clientMeta.room && rooms[clientMeta.room]) {
+                        const ext = data.filename.split('.').pop();
+                        let cmd = "";
+
+                        if (ext === "py") cmd = `python "${data.filename}"`;
+                        else if (ext === "js") cmd = `node "${data.filename}"`;
+                        else if (ext === "html" || ext === "htm") {
+                            broadcastToRoom(clientMeta.room, null, { type: "terminal-output", output: "\n[Système] Impossible d'exécuter un fichier HTML dans la console.\n" });
+                            break;
+                        } else {
+                            cmd = `echo Extension .${ext} non configurée pour l'exécution directe.`;
+                        }
+
+                        broadcastToRoom(clientMeta.room, null, { type: "terminal-output", output: `\n[Exécution] > ${cmd}\n` });
+
+                        exec(cmd, (error, stdout, stderr) => {
+                            const output = stdout || stderr || (error ? error.message : "Fin de l'exécution.");
+                            broadcastToRoom(clientMeta.room, null, {
+                                type: "terminal-output",
+                                output: `${output}\n`
+                            });
+                        });
                     }
                     break;
             }
@@ -195,7 +232,9 @@ function getRoomClients(roomCode) {
 function broadcastToRoom(roomCode, sender, data) {
     if (!rooms[roomCode]) return;
     const payload = JSON.stringify(data);
-    rooms[roomCode].clients.forEach((client) => {
-        if (client !== sender && client.readyState === 1) client.send(payload);
+    rooms[roomCode].clients.forEach(client => {
+        if (client !== sender && client.readyState === 1) {
+            client.send(payload);
+        }
     });
 }
