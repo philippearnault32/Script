@@ -132,38 +132,34 @@
         });
 
         function setupWebSocket() {
-        // 1. On analyse l'URL de la page pour voir si le script a donne un tunnel
             const urlParams = new URLSearchParams(window.location.search);
             let serverURL = urlParams.get('tunnel');
-    
-            let wsAddress = "ws://localhost:8080"; // Adresse par defaut
 
-            // 2. Si le script a transmis le tunnel automatiquement
+            let wsAddress = "ws://localhost:8080"; // Adresse par défaut pour toi l'hôte
+
             if (serverURL) {
                 wsAddress = `wss://${serverURL}`;
                 console.log("Connexion automatique au tunnel : " + wsAddress);
             } else {
-                // Option de secours au cas ou l'ami ouvre le fichier HTML directement sans le script
-                let manualURL = prompt("Entrez l'adresse du tunnel fournie par l'hote (ou laissez vide pour localhost) :", "");
+                // 🟢 C'est cette case qui va s'ouvrir chez ton pote s'il lance index.html sans paramètre URL !
+                let manualURL = prompt("ENTRE LE LIEN DU TUNNEL (ex: xxxx.localtunnel.me) envoyé par ton pote :", "");
                 if (manualURL) {
+                    // Nettoyage au cas où il colle le lien entier avec le https://
                     manualURL = manualURL.replace("https://", "").replace("http://", "");
                     wsAddress = `wss://${manualURL}`;
                 }
             }
 
-            // 3. Connexion au WebSocket
             ws = new WebSocket(wsAddress);
 
             ws.onopen = () => { 
                 document.getElementById('status').innerText = "Serveur Connecté"; 
                 ws.send(JSON.stringify({ type: "set-pseudo", pseudo: myPseudo }));
             };
-    
+
             ws.onclose = () => { 
                 document.getElementById('status').innerText = "Serveur Déconnecté"; 
             };
-
-            // ... (Laisse tout ton code ws.onmessage en dessous inchangé)
 
             ws.onmessage = async (event) => {
                 const data = JSON.parse(event.data);
