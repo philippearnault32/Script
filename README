@@ -1,0 +1,40 @@
+Voici un texte complet, professionnel et structuré pour ton fichier **README.md**. Il explique clairement le projet, ses fonctionnalités et comment l'installer ou le déployer.
+
+Tu peux copier-coller le contenu ci-dessous directement dans ton fichier `README.md` (sur ton PC ou directement sur GitHub) :
+
+```markdown
+# 🚀 IDE Collaboratif Synchrone Pro
+
+Un environnement de développement intégré (IDE) léger, rapide et entièrement collaboratif en temps réel. Développez, partagez et codez à plusieurs instantanément, directement depuis votre navigateur.
+
+Le projet utilise **Monaco Editor** (le moteur derrière VS Code) pour le frontend, couplé à un serveur de communication bidirectionnelle **Node.js** via les **WebSockets**.
+
+---
+
+## ✨ Fonctionnalités
+
+- 👥 **Collaboration en temps réel** : Voyez les modifications de code de vos collaborateurs instantanément.
+- 📍 **Curseurs et Souris Partagés** : Suivez les mouvements de souris et la position des curseurs de chaque utilisateur avec leur pseudonyme et une couleur dédiée.
+- 📁 **Gestionnaire de Fichiers** : Importez un projet local, parcourez l'arborescence des fichiers et créez des dossiers/fichiers de manière synchronisée.
+- 💬 **Système de Sessions** : Créez une session unique générant un code d'accès ou rejoignez une session existante en un clic.
+- 🔍 **Recherche Intégrée** : Un système de recherche pour filtrer et trouver rapidement des éléments dans votre projet.
+
+---
+
+## 🛠️ Architecture Technique
+
+Le projet est découpé en deux parties :
+1. **Frontend (`index.html`)** : Interface utilisateur utilisant l'éditeur Monaco de Microsoft. Hébergé de manière statique (par exemple sur *GitHub Pages*).
+2. **Backend (`backend.js`)** : Serveur Node.js gérant les salons (rooms) et redistribuant les événements de modification et de présence. Hébergé sur *Railway*.
+
+---
+
+## 🚀 Installation Locale
+
+### Prérequis
+- [Node.js](https://nodejs.org/) (version 16 ou supérieure) installé sur votre machine.
+
+### Étape 1 : Cloner le projet
+```bash
+git clone [https://github.com/philippearnault32/Editeur-code-collaboratif.git](https://github.com/philippearnault32/Editeur-code-collaboratif.git)
+cd Editeur-code-collaboratif
