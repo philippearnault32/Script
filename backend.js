@@ -3,11 +3,43 @@ const { exec } = require('child_process');
 const fs = require('fs');    
 const path = require('path');  
 
-// Railway ou un autre hébergeur va injecter la variable process.env.PORT
 const port = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port: port });
 
 console.log(`=== SERVEUR EN LIGNE SUR LE PORT ${port} ===`);
+
+// --- AUTOMATISATION DU TUNNEL ET DU NAVIGATEUR ---
+// On lance localtunnel directement depuis Node.js pour éviter les bugs Windows (.bat)
+const localtunnelProcess = exec(`npx localtunnel --port ${port}`, (error, stdout, stderr) => {
+    if (error) {
+        console.error(`[Localtunnel Erreur] : ${error.message}`);
+    }
+});
+
+// Lecture du flux généré par localtunnel pour attraper l'URL
+localtunnelProcess.stdout.on('data', (data) => {
+    const output = data.toString();
+    // On cherche la ligne contenant l'URL (ex: your url is: https://xxxx.loca.lt)
+    if (output.includes('url is:')) {
+        const rawUrl = output.split('url is:')[1].trim();
+        console.log(`[Succès] URL publique détectée : ${rawUrl}`);
+        
+        // Nettoyage pour extraire uniquement le sous-domaine (ex: xxxx.loca.lt)
+        let cleanUrl = rawUrl.replace('https://', '').replace('http://', '').trim();
+        const targetAddress = `http://localhost:8080/?tunnel=${cleanUrl}`;
+        
+        console.log(`[Navigateur] Ouverture automatique de : ${targetAddress}`);
+        
+        // Commande Windows standard pour ouvrir l'URL dans le navigateur par défaut
+        exec(`start ${targetAddress}`);
+    }
+});
+
+// Capturer les erreurs potentielles de flux
+localtunnelProcess.stderr.on('data', (data) => {
+    console.error(`[Localtunnel Statut] : ${data.toString().trim()}`);
+});
+// -------------------------------------------------
 
 const clients = new Map();
 const rooms = {};
